@@ -17,6 +17,20 @@ struct Command {
     CommandFunc runCommand;
 };
 
-extern Command commands[];
+extern Command cmd_networkControl;
+extern Command cmd_arduinoOTAEnable;
+extern Command cmd_color;
+extern Command cmd_dmxAddress;
+extern Command cmd_dmxUniverse;
+
+Command commands[] = {
+  cmd_networkControl,
+  cmd_arduinoOTAEnable,
+  cmd_color,
+  cmd_dmxAddress,
+  cmd_dmxUniverse
+};
+
+const int num_commands = sizeof(commands)/sizeof(Command);
 
 #endif

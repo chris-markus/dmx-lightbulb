@@ -7,8 +7,7 @@
 #include <ESP8266WebServer.h>
 #include "StreamString.h"
 #include <flash_hal.h>
-#include <FS.h>
-//#include <DNSServer.h>
+//#include <FS.h>
 
 #include "driver.h"
 #include "settings.h"
@@ -16,8 +15,9 @@
 #include "command.h"
 
 int webserverPoll = 50; // ms
-bool webserverEnabled = true; // ms
+bool webserverEnabled = true;
 
+// TODO: delete if remains unused
 String _webContentBuffer = "";
 
 ESP8266WebServer server(80);
@@ -29,6 +29,7 @@ void StartWebserver() {
 
   server.on("/", handleRoot);
   server.on("/settings", handleSettings);
+  server.on("/console", handleConsole);
   server.onNotFound(handleNotFound);
 
   server.on("/cmd", handleCmd);
@@ -98,16 +99,46 @@ void handleRoot() {
   // TODO: Add the address or name here
   WebserverStartPage("DMX Lightbulb");
   WebserverStatusReadout();
-  WebserverButton(F("DMX Settings"), F("/settings"));
+  WebserverButton(F("Settings"), F("/settings"));
+  WebserverButton(F("Console"), F("/console"));
   WebserverButton(F("Firmware Update"), F("/update"));
   WebserverEndPage();
 }
 
 void handleSettings() {
+  const char selected[] = "selected";
+  const char empty[] = "";
   WebserverStartPage("Settings");
   WebserverStatusReadout();
-  WebserverAddFragment(sizeof(WEBPAGE_SETTINGS) + 1, WEBPAGE_SETTINGS);
+  WebserverAddFragment(
+    sizeof(WEBPAGE_SETTINGS) + 1 + 3 + 3, 
+    WEBPAGE_SETTINGS,
+    Settings.artnetEnable?selected:empty,
+    Settings.sACNEnable?selected:empty,
+    (!Settings.artnetEnable && !Settings.sACNEnable)?selected:empty,
+    Settings.DMXAddress,
+    Settings.DMXUniverse);
   WebserverEndPage();
+}
+
+void handleConsole() {
+  WebserverStartPage("Console");
+  WebserverEndPage();
+}
+
+void handleNotFound() {
+  String message = "File Not Found\n\n";
+  message += "URI: ";
+  message += server.uri();
+  message += "\nMethod: ";
+  message += (server.method() == HTTP_GET) ? "GET" : "POST";
+  message += "\nArguments: ";
+  message += server.args();
+  message += "\n";
+  for (uint8_t i = 0; i < server.args(); i++) {
+    message += " " + server.argName(i) + ": " + server.arg(i) + "\n";
+  }
+  server.send(404, "text/plain", message);
 }
 
 void handleCmd() {
@@ -115,11 +146,12 @@ void handleCmd() {
   String redirectURI = "";
   String msg = "";
   if (server.args() == 0) {
-    // send page to select commands
+    server.send(200, "text/plain", "NO COMMAND");
+    return;
   }
 
   for (uint8_t i = 0; i < server.args(); i++) {
-    for (int l=0; l<(sizeof(commands)/sizeof(struct Command)); l++) {
+    for (int l=0; l<num_commands; l++) {
       if (strcmp(commands[l].cmdName, server.argName(i).c_str()) == 0) {
         // set status true if at least 1 command completes
         status |= commands[l].runCommand(commands[l].setting, server.arg(i).c_str());
@@ -140,21 +172,6 @@ void handleCmd() {
     // TODO: send back a real json response
     server.send(200, "text/plain", status?"OK":"FAIL");
   }
-}
-
-void handleNotFound() {
-  String message = "File Not Found\n\n";
-  message += "URI: ";
-  message += server.uri();
-  message += "\nMethod: ";
-  message += (server.method() == HTTP_GET) ? "GET" : "POST";
-  message += "\nArguments: ";
-  message += server.args();
-  message += "\n";
-  for (uint8_t i = 0; i < server.args(); i++) {
-    message += " " + server.argName(i) + ": " + server.arg(i) + "\n";
-  }
-  server.send(404, "text/plain", message);
 }
 
 // --------------------------- Utilities ----------------------------
@@ -256,6 +273,9 @@ void setupUpdatePage(String& path) {
   });
 }
 
-struct Driver drv_webServer() {
-  return (Driver){&webserverPoll, StartWebserver, WebserverLoop, &webserverEnabled};
-}
+struct Driver drv_webServer = {
+  &webserverPoll,
+  StartWebserver,
+  WebserverLoop,
+  &webserverEnabled
+};

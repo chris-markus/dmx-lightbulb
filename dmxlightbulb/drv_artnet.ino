@@ -5,7 +5,7 @@
 // =====================================================
 
 #include "driver.h"
-#include "settings.h"
+#include "constants.h"
 
 #ifndef WHITE_PIN
     #define WHITE_PIN 12
@@ -16,12 +16,16 @@
 ArtnetWifi artnet;
 
 void artnetSetup() {
+  static bool initialized = false;
+  if (!initialized) {
     artnet.begin();
     artnet.setArtDmxCallback(onDmxFrame);
+    initialized = true;
+  }
 }
 
 void artnetLoop() {
-    artnet.read();
+  artnet.read();
 }
 
 void onDmxFrame(uint16_t universe, uint16_t length, uint8_t sequence, uint8_t* data)
@@ -29,7 +33,7 @@ void onDmxFrame(uint16_t universe, uint16_t length, uint8_t sequence, uint8_t* d
   if (universe == Settings.DMXUniverse)
   {
     uint16_t address = Settings.DMXAddress - 1; // data is indexed from 0, address starts at 1
-    if (address < )
+    if (address < DMX_MAX_UNIVERSE)
     setLEDColor(data[address], 
                 data[address + 1], 
                 data[address + 2], 
@@ -37,11 +41,9 @@ void onDmxFrame(uint16_t universe, uint16_t length, uint8_t sequence, uint8_t* d
   }
 }
 
-struct Driver drv_artnet() {
-    return (Driver){
-        &Settings.artnetPollDelay, 
-        artnetSetup, 
-        artnetLoop, 
-        &Settings.artnetEnable
-    };
-}
+struct Driver drv_artnet = {
+  &Settings.artnetPollDelay, 
+  artnetSetup, 
+  artnetLoop, 
+  &Settings.artnetEnable
+};

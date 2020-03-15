@@ -10,10 +10,6 @@
 #ifndef SETTINGS_H
 #define SETTINGS_H
 
-// TODO: move these to a constants file
-#define DMX_MAX_ADDRESS 512
-#define DMX_MAX_UNIVERSE 128
-
 struct CONFIG {
     int DMXUniverse = 1;
     int DMXAddress = 1;

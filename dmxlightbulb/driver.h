@@ -16,16 +16,16 @@ struct Driver {
     bool* enabled;
 };
 
-struct Driver drv_sACN();
-struct Driver drv_webServer();
-struct Driver drv_OTA();
-struct Driver drv_artnet();
+extern Driver drv_sACN;
+extern Driver drv_webServer;
+extern Driver drv_OTA;
+extern Driver drv_artnet;
 
 Driver drivers[] = {
-    drv_webServer(),
-    drv_sACN(),
-    drv_artnet(),
-    drv_OTA(),
+    drv_webServer,
+    drv_sACN,
+    drv_artnet,
+    drv_OTA,
 };
 
 const int num_drivers = sizeof(drivers)/sizeof(Driver);

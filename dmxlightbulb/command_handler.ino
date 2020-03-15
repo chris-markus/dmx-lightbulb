@@ -6,8 +6,10 @@
 
 #include "command.h"
 #include "settings.h"
+#include "constants.h"
+#include "driver.h"
 
-bool setBoolSetting(void* setting, const char* value) {
+bool boolCmdHelper(void* setting, const char* value) {
   bool *_setting = (bool*)(setting);
   if (strcmp(value, "1") == 0) {
     *_setting = true;
@@ -21,7 +23,7 @@ bool setBoolSetting(void* setting, const char* value) {
   return true;
 }
 
-bool numericSettingHelper(void* setting_v, const char* val_str, int highVal, int lowVal) {
+bool numericCmdHelper(void* setting_v, const char* val_str, int highVal, int lowVal) {
   int *_setting = (int*)(setting_v);
   int val = strtol(val_str, NULL, 10);
   if (val <= highVal && val >= lowVal) {
@@ -31,19 +33,19 @@ bool numericSettingHelper(void* setting_v, const char* val_str, int highVal, int
   return false;
 }
 
-bool setDMXAddress(void* setting, const char* value) {
+bool cmd_DMXAddressHandler(void* setting, const char* value) {
   int high = DMX_MAX_ADDRESS; 
   int low = 1;
-  return numericSettingHelper(setting, value, high, low);
+  return numericCmdHelper(setting, value, high, low);
 }
 
-bool setDMXUniverse(void* setting, const char* value) {
+bool cmd_DMXUniverseHandler(void* setting, const char* value) {
   int high = DMX_MAX_UNIVERSE;
   int low = 1;
-  return numericSettingHelper(setting, value, high, low);
+  return numericCmdHelper(setting, value, high, low);
 }
 
-bool setColorSetting(void* setting, const char* value) {
+bool cmd_colorHandler(void* setting, const char* value) {
   String colorString(value);
   Settings.artnetEnable = false;
   Settings.sACNEnable = false;
@@ -63,56 +65,61 @@ bool setColorSetting(void* setting, const char* value) {
   return false;
 }
 
-Command commands[] = {
-  {
-    "artnetEnable",
-    (void*)(&Settings.artnetEnable),
-    setBoolSetting,
-  },
-  {
-    "sACNEnable",
-    (void*)(&Settings.sACNEnable),
-    setBoolSetting,
-  },
-  {
-    "arduinoOTAEnable",
-    (void*)(&Settings.arduinoOTAEnable),
-    setBoolSetting,
-  },
-  {
-    "color",
-    NULL,
-    setColorSetting,
-  },
-  {
-    "dmxAddress",
-    (void*)(&Settings.DMXAddress),
-    setDMXAddress,
-  },
-  {
-    "dmxUniverse",
-    (void*)(&Settings.DMXUniverse),
-    setDMXUniverse,
-  }
-};
-
-//Command artnetEnable(F("artnetEnable"), 2, ["0", "1"], setArtnetEnable);
-//Command sACNEnable(F("sACNEnable"), 2, ["0", "1"], setsACNEnable)
-/*
-bool setArtnetEnable(String& value) {
-  if (server.arg(i) == F("1")) {
+bool cmd_networkControlHandler(void* setting, const char* value) {
+  if (strcmp(value, "artnet") == 0) {
     Settings.artnetEnable = true;
+    Settings.sACNEnable = false;
+    drv_artnet.setupFunc();
   }
-  else {
+  else if (strcmp(value, "sacn") == 0) {
     Settings.artnetEnable = false;
-  }
-}
-
-bool setsACNEnable(String& value) {
-  if (server.arg(i) == F("1")) {
     Settings.sACNEnable = true;
+    drv_sACN.setupFunc();
   }
-  else {
+  else if (strcmp(value, "none") == 0) {
+    Settings.artnetEnable = false;
     Settings.sACNEnable = false;
   }
-}*/
+  else {
+    return false;
+  }
+  return true;
+}
+
+bool cmd_arduinoOTAHandler(void* setting, const char* value) {
+  bool retVal = boolCmdHelper(setting, value);
+  if (retVal && Settings.arduinoOTAEnable) {
+    drv_OTA.setupFunc();
+  }
+  return retVal;
+}
+
+Command cmd_networkControl = {
+  "networkControl",
+  NULL,
+  cmd_networkControlHandler,
+};
+
+Command cmd_arduinoOTAEnable = {
+  "arduinoOTAEnable",
+  (void*)(&Settings.arduinoOTAEnable),
+  cmd_arduinoOTAHandler,
+};
+
+Command cmd_color = {
+  "color",
+  NULL,
+  cmd_colorHandler,
+};
+
+Command cmd_dmxAddress = {
+  "dmxAddress",
+  (void*)(&Settings.DMXAddress),
+  cmd_DMXAddressHandler,
+};
+
+Command cmd_dmxUniverse = {
+  "dmxUniverse",
+  (void*)(&Settings.DMXUniverse),
+  cmd_DMXUniverseHandler,
+};

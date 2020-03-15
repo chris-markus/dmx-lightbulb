@@ -15,10 +15,14 @@ ESPAsyncE131 e131(UNIVERSE_COUNT);
 #include "settings.h"
 
 void sACNSetup() {
-  if (e131.begin(E131_MULTICAST, Settings.DMXUniverse, UNIVERSE_COUNT))   // Listen via Multicast
-    Serial.println(F("sACN Listening"));
-  else 
-    Serial.println(F("sACN Init FAILED"));
+  static bool initialized = false;
+  if (!initialized) {
+    if (e131.begin(E131_MULTICAST, Settings.DMXUniverse, UNIVERSE_COUNT))   // Listen via Multicast
+      Serial.println(F("sACN Listening"));
+    else 
+      Serial.println(F("sACN Init FAILED"));
+    initialized = true;
+  }
 }
 
 void sACNLoop() {
@@ -35,11 +39,9 @@ void sACNLoop() {
   }
 }
 
-struct Driver drv_sACN() {
-  return (Driver){
-    &Settings.sACNPollDelay, 
-    sACNSetup, 
-    sACNLoop, 
-    &Settings.sACNEnable
-  };
-}
+struct Driver drv_sACN = {
+  &Settings.sACNPollDelay, 
+  sACNSetup, 
+  sACNLoop, 
+  &Settings.sACNEnable
+};

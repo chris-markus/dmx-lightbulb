@@ -17,8 +17,12 @@ const char WEBPAGE_GLOBAL_STYLE[] PROGMEM =
   "select{width:100%%;background: " COLOR_INPUT ";color: " COLOR_TEXT ";}"  
   "textarea{resize:vertical;width:98%%;height:318px;padding:5px;overflow:auto;background: " COLOR_INPUT ";color: " COLOR_TEXT ";}"
   "body{text-align:center;font-family:verdana,sans-serif;background: " COLOR_BACKGROUND ";}"
-  ".button{width: 100%; display: block; text-decoration: none; background: " COLOR_FOREGROUND "; border-radius: 5px; color: " COLOR_TEXT_INVERT"; padding: 8px; margin: 8px 0; text-align: center; cursor: pointer}"
-  "td{padding:0px;}";
+  ".button, .button-inv{width: 100%; display: block; text-decoration: none; border-radius: 5px; padding: 8px; margin: 8px 0; text-align: center; cursor: pointer}"
+  ".button{background: " COLOR_FOREGROUND "; color: " COLOR_TEXT_INVERT";}"
+  ".button-inv{background: " COLOR_BACKGROUND "; color: " COLOR_LIGHT_FOREGROUND"; border: 1px solid " COLOR_LIGHT_FOREGROUND "}"
+  "td:nth-child(1){text-align: right;}"
+  "td{padding:0px;}"
+  "a{color: #aaa;}";
 
 const char WEBPAGE_HEAD[] PROGMEM =
   "<!DOCTYPE html><html lang=\"en\" class=\"\">"
@@ -37,7 +41,8 @@ const char WEBPAGE_BODY_START[] PROGMEM =
 
 const char WEBPAGE_END[] PROGMEM =
       "<div style='text-align:right;font-size:11px;border-top: 1px solid " COLOR_LIGHT_FOREGROUND "'>"
-        "Created by <a href='https://chrismarkus.me' target='_blank' style='color:#aaa;'>Chris Markus</a>. Source <a href='https://github.com/chris-markus/dmx-lightbulb'>Here</a>"
+        "<a class='button-inv' href='/'>Home</a>"
+        "Created by <a href='https://github.com/chris-markus/' target='_blank'>Chris Markus</a>. <a href='https://github.com/chris-markus/dmx-lightbulb'>Source</a>"
       "</div>"
       "</div>"
     "</body>"
@@ -85,11 +90,29 @@ static const char WEBPAGE_UPDATE_SUCCESS[] PROGMEM =
 
 
 // ------------------------------ Settings Page --------------------------------
+
+// Params:
+//  int dmxAddress
+//  int dmxUniverse
 static const char WEBPAGE_SETTINGS[] PROGMEM =
-  "<h2>Settings</h2>"
   "<form method='POST' action='/cmd'>"
-    "<label for='address'>DMX Address</label>"
-    "<input type='text' name='dmxAddress' id='address'>"
+    "<h2>General</h2>"
+    "<h2>Network Control (ArtNet, sACN)</h2>"
+    "<table>"
+    "<tr>"
+    "<td><label for='networkControl'>Control Protocol: </label></td>"
+    "<td><select name='networkControl' id='networkControl'>"
+      "<option value='artnet' %s >ArtNet</option>"
+      "<option value='sacn' %s >sACN</option>"
+      "<option value='none' %s >Disabled</option>"
+    "</select></td>"
+    "</tr><tr>"
+    "<td><label for='address'>Address: </label></td>"
+    "<td><input type='text' name='dmxAddress' placeholder='%d' id='address'></td>"
+    "</tr><tr>"
+    "<td><label for='universe'>Universe: </label></td>"
+    "<td><input type='text' name='dmxUniverse' placeholder='%d' id='universe'></td>"
+    "</tr></table>"
     "<input hidden name='redirect' value='/settings'>"
     "<input class='button' type='submit' value='Save'>"
   "</form>"

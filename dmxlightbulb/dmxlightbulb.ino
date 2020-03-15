@@ -31,12 +31,9 @@ void setup() {
   Serial.begin(115200);
   Serial.println("Booting...");
   LEDSetup();
-  //pinMode(WHITE_PIN, OUTPUT);
 
   WiFi.mode(WIFI_STA);
   WiFi.begin(ssid, password);
-
-  //beginNetworkControl();
 
   while (WiFi.waitForConnectResult() != WL_CONNECTED) {
     Serial.println("Connection Failed! Rebooting...");
