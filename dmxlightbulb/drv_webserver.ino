@@ -5,19 +5,30 @@
 // =====================================================
 
 #include <ESP8266WebServer.h>
+#include "StreamString.h"
+#include <flash_hal.h>
+#include <FS.h>
 //#include <DNSServer.h>
 
 #include "driver.h"
 #include "settings.h"
 #include "web_content.h"
+#include "command.h"
 
 int webserverPoll = 50; // ms
 bool webserverEnabled = true; // ms
 
+String _webContentBuffer = "";
+
 ESP8266WebServer server(80);
 
 void StartWebserver() {
+
+  String updateURL = "/update";
+  setupUpdatePage(updateURL);
+
   server.on("/", handleRoot);
+  server.on("/settings", handleSettings);
   server.onNotFound(handleNotFound);
 
   server.on("/cmd", handleCmd);
@@ -31,67 +42,122 @@ void WebserverLoop() {
 }
 
 // *ahem* borrowed from https://github.com/arendst/Tasmota
-void WebserverSendHeader(void)
+void WebserverSendHeaders()
 {
   server.sendHeader(F("Cache-Control"), F("no-cache, no-store, must-revalidate"));
   server.sendHeader(F("Pragma"), F("no-cache"));
   server.sendHeader(F("Expires"), F("-1"));
 }
 
-void handleRoot() {
+void WebserverHead(String title) {
+  int len = sizeof(WEBPAGE_HEAD) + sizeof(WEBPAGE_GLOBAL_STYLE);
+  WebserverAddFragment(len, WEBPAGE_HEAD, WEBPAGE_GLOBAL_STYLE);
+}
+
+void WebserverStartPage(String pageTitle, int status = 200) {
   server.client().flush();
-  WebserverSendHeader();
+  WebserverSendHeaders();
   server.setContentLength(CONTENT_LENGTH_UNKNOWN);
-  server.send(200, "text/html", "");
-  server.sendContent(HTTP_HEADER);
-  server.sendContent(HTTP_HEAD_1);
-  server.sendContent(HTTP_BODY_1);
-  sendStatusReadout();
-  sendButton(F("DMX Settings"), F("/settings"));
-  server.sendContent(HTTP_END);
+  server.send(status, F("text/html"), "");
+  WebserverHead(pageTitle);
+  server.sendContent(WEBPAGE_BODY_START);
+  //_webContentBuffer.clear()
 }
 
-void sendStatusReadout() {
-  int len = sizeof(HTTP_STATUS_READOUT) + 100;
-  char *buff = new char[len];
-  snprintf(buff, len, HTTP_STATUS_READOUT, "Light Name", Settings.ipAddress, Settings.DMXUniverse, Settings.DMXAddress);
+void WebserverEndPage() {
+  server.sendContent(WEBPAGE_END);
+  //_webContentBuffer.clear();
+}
+
+void WebserverAddFragment(int bufferSize, const char* format, ...) {
+  char* buff = new char[bufferSize];
+  va_list arg;
+  va_start(arg, format);
+  int len = vsnprintf(buff, bufferSize, format, arg);
+  va_end(arg);
+
   server.sendContent(buff);
   delete buff;
 }
 
-void sendButton(String title, String linkURL) {
-  int len = sizeof(HTTP_BUTTON) + title.length() + linkURL.length() + 1;
-  char *buff = new char[len];
-  snprintf(buff, len, HTTP_BUTTON, linkURL.c_str(), title.c_str());
-  server.sendContent(buff);
-  delete buff;
+// ---------------------------- Components -------------------------------
+
+void WebserverStatusReadout() {
+  int len = sizeof(WEBPAGE_STATUS_READOUT) + 100;
+  WebserverAddFragment(len, WEBPAGE_STATUS_READOUT, "Light Name", Settings.ipAddress, Settings.DMXUniverse, Settings.DMXAddress);
+}
+
+void WebserverButton(String title, String linkURL) {
+  int len = sizeof(WEBPAGE_BUTTON) + title.length() + linkURL.length() + 1;
+  WebserverAddFragment(len, WEBPAGE_BUTTON, linkURL.c_str(), title.c_str());
+}
+
+// --------------------------- Route Handlers ----------------------------
+
+void handleRoot() {
+  // TODO: Add the address or name here
+  WebserverStartPage("DMX Lightbulb");
+  WebserverStatusReadout();
+  WebserverButton(F("DMX Settings"), F("/settings"));
+  WebserverButton(F("Firmware Update"), F("/update"));
+  WebserverEndPage();
+}
+
+void handleSettings() {
+  WebserverStartPage("Settings");
+  WebserverStatusReadout();
+  WebserverAddFragment(sizeof(WEBPAGE_SETTINGS) + 1, WEBPAGE_SETTINGS);
+  WebserverEndPage();
 }
 
 void handleCmd() {
-  bool status = true;
+  bool status = false;
+  String redirectURI = "";
+  String msg = "";
   if (server.args() == 0) {
     // send page to select commands
   }
+
   for (uint8_t i = 0; i < server.args(); i++) {
-    if (server.argName(i) == F("color")) {
-      if (!setColor(server.arg(i))) {
-        status = false;
+    for (int l=0; l<(sizeof(commands)/sizeof(struct Command)); l++) {
+      if (strcmp(commands[l].cmdName, server.argName(i).c_str()) == 0) {
+        // set status true if at least 1 command completes
+        status |= commands[l].runCommand(commands[l].setting, server.arg(i).c_str());
+        break;
       }
     }
-    else if (server.argName(i) == F("artnetEnable")) {
-      if (server.arg(i) == F("1")) {
-        Settings.artnetEnable = true;
-      }
-      else {
-        Settings.artnetEnable = false;
-      }
-    }
-    else {
-      status = false;
+
+    if (server.argName(i) == F("redirect")) {
+      redirectURI = server.arg(i);
     }
   }
-  server.send(status?200:500, "text/plain", status?"OK":"FAIL");
+
+  if (redirectURI != "") {
+    server.sendHeader("Location", redirectURI, true);
+    server.send( 302, "text/plain", "");
+  }
+  else {
+    // TODO: send back a real json response
+    server.send(200, "text/plain", status?"OK":"FAIL");
+  }
 }
+
+void handleNotFound() {
+  String message = "File Not Found\n\n";
+  message += "URI: ";
+  message += server.uri();
+  message += "\nMethod: ";
+  message += (server.method() == HTTP_GET) ? "GET" : "POST";
+  message += "\nArguments: ";
+  message += server.args();
+  message += "\n";
+  for (uint8_t i = 0; i < server.args(); i++) {
+    message += " " + server.argName(i) + ": " + server.arg(i) + "\n";
+  }
+  server.send(404, "text/plain", message);
+}
+
+// --------------------------- Utilities ----------------------------
 
 bool setColor(const String colorString) {
   Settings.artnetEnable = false;
@@ -112,113 +178,84 @@ bool setColor(const String colorString) {
   return false;
 }
 
-void handleNotFound() {
-  String message = "File Not Found\n\n";
-  message += "URI: ";
-  message += server.uri();
-  message += "\nMethod: ";
-  message += (server.method() == HTTP_GET) ? "GET" : "POST";
-  message += "\nArguments: ";
-  message += server.args();
-  message += "\n";
-  for (uint8_t i = 0; i < server.args(); i++) {
-    message += " " + server.argName(i) + ": " + server.arg(i) + "\n";
+String _updaterError = "";
+bool _serial_output = true;
+
+void _setUpdaterError() {
+  if (_serial_output) {
+    Update.printError(Serial);
   }
-  server.send(404, "text/plain", message);
+  StreamString str;
+  Update.printError(str);
+  _updaterError = str.c_str();
+}
+
+void setupUpdatePage(String& path) {
+  // handler for the /update form page
+  server.on(path.c_str(), HTTP_GET, [&](){
+    const char selected[] = "selected";
+    const char empty[] = "";
+    WebserverStartPage("Update Firmware");
+    WebserverAddFragment(sizeof(WEBPAGE_UPDATE) + 20, 
+      WEBPAGE_UPDATE,
+      Settings.arduinoOTAEnable?selected:empty, 
+      !Settings.arduinoOTAEnable?selected:empty);
+    WebserverEndPage();
+  });
+
+  // handler for the /update form POST (once file upload finishes)
+  server.on(path.c_str(), HTTP_POST, [&](){
+    if (Update.hasError()) {
+      server.send(200, F("text/html"), String(F("Update error: ")) + _updaterError);
+    } else {
+      server.client().setNoDelay(true);
+      server.send_P(200, PSTR("text/html"), WEBPAGE_UPDATE_SUCCESS);
+      delay(100);
+      server.client().stop();
+      ESP.restart();
+    }
+  },[&](){
+    // handler for the file upload, get's the sketch bytes, and writes
+    // them through the Update object
+    HTTPUpload& upload = server.upload();
+
+    if(upload.status == UPLOAD_FILE_START) {
+
+      WiFiUDP::stopAll();
+      if (_serial_output)
+        Serial.printf("Update: %s\n", upload.filename.c_str());
+      if (upload.name == "filesystem") {
+        size_t fsSize = ((size_t) &_FS_end - (size_t) &_FS_start);
+        close_all_fs();
+        if (!Update.begin(fsSize, U_FS)){//start with max available size
+          if (_serial_output) Update.printError(Serial);
+        }
+      } else {
+        uint32_t maxSketchSpace = (ESP.getFreeSketchSpace() - 0x1000) & 0xFFFFF000;
+        if (!Update.begin(maxSketchSpace, U_FLASH)){//start with max available size
+          _setUpdaterError();
+        }
+      }
+    } else if(upload.status == UPLOAD_FILE_WRITE && !_updaterError.length()){
+      if (_serial_output) Serial.printf(".");
+      if(Update.write(upload.buf, upload.currentSize) != upload.currentSize){
+        _setUpdaterError();
+      }
+    } else if(upload.status == UPLOAD_FILE_END && !_updaterError.length()){
+      if(Update.end(true)){ //true to set the size to the current progress
+        if (_serial_output) Serial.printf("Update Success: %u\nRebooting...\n", upload.totalSize);
+      } else {
+        _setUpdaterError();
+      }
+      if (_serial_output) Serial.setDebugOutput(false);
+    } else if(upload.status == UPLOAD_FILE_ABORTED){
+      Update.end();
+      if (_serial_output) Serial.println("Update was aborted");
+    }
+    delay(0);
+  });
 }
 
 struct Driver drv_webServer() {
   return (Driver){&webserverPoll, StartWebserver, WebserverLoop, &webserverEnabled};
 }
-
-/*
-void StartWebserver(int type, IPAddress ipweb)
-{
-  if (!Settings.web_refresh) { Settings.web_refresh = HTTP_REFRESH_TIME; }
-  if (!Web.state) {
-    if (!WebServer) {
-      WebServer = new ESP8266WebServer((HTTP_MANAGER == type || HTTP_MANAGER_RESET_ONLY == type) ? 80 : WEB_PORT);
-      WebServer->on("/", HandleRoot);
-      WebServer->onNotFound(HandleNotFound);
-      WebServer->on("/up", HandleUpgradeFirmware);
-      WebServer->on("/u1", HandleUpgradeFirmwareStart);  // OTA
-      //XdrvCall(FUNC_WEB_ADD_HANDLER);
-      //XsnsCall(FUNC_WEB_ADD_HANDLER);
-    }
-
-    WebServer->begin(); // Web server start
-  }
-  if (Web.state != type) {
-#if LWIP_IPV6
-    String ipv6_addr = WifiGetIPv6();
-    if(ipv6_addr!="") AddLog_P2(LOG_LEVEL_INFO, PSTR(D_LOG_HTTP D_WEBSERVER_ACTIVE_ON " %s%s " D_WITH_IP_ADDRESS " %s and IPv6 global address %s "), my_hostname, (Wifi.mdns_begun) ? ".local" : "", ipweb.toString().c_str(),ipv6_addr.c_str());
-    else AddLog_P2(LOG_LEVEL_INFO, PSTR(D_LOG_HTTP D_WEBSERVER_ACTIVE_ON " %s%s " D_WITH_IP_ADDRESS " %s"), my_hostname, (Wifi.mdns_begun) ? ".local" : "", ipweb.toString().c_str());
-#else
-    AddLog_P2(LOG_LEVEL_INFO, PSTR(D_LOG_HTTP D_WEBSERVER_ACTIVE_ON " %s%s " D_WITH_IP_ADDRESS " %s"), my_hostname, (Wifi.mdns_begun) ? ".local" : "", ipweb.toString().c_str());
-#endif // LWIP_IPV6 = 1
-    rules_flag.http_init = 1;
-  }
-  if (type) { Web.state = type; }
-}
-
-void StopWebserver(void)
-{
-  if (Web.state) {
-    WebServer->close();
-    Web.state = HTTP_OFF;
-    AddLog_P(LOG_LEVEL_INFO, PSTR(D_LOG_HTTP D_WEBSERVER_STOPPED));
-  }
-}
-
-void WifiManagerBegin(bool reset_only)
-{
-  // setup AP
-  if (!global_state.wifi_down) {
-//    WiFi.mode(WIFI_AP_STA);
-    WifiSetMode(WIFI_AP_STA);
-    AddLog_P(LOG_LEVEL_DEBUG, PSTR(D_LOG_WIFI D_WIFIMANAGER_SET_ACCESSPOINT_AND_STATION));
-  } else {
-//    WiFi.mode(WIFI_AP);
-    WifiSetMode(WIFI_AP);
-    AddLog_P(LOG_LEVEL_DEBUG, PSTR(D_LOG_WIFI D_WIFIMANAGER_SET_ACCESSPOINT));
-  }
-
-  StopWebserver();
-
-  DnsServer = new DNSServer();
-
-  int channel = WIFI_SOFT_AP_CHANNEL;
-  if ((channel < 1) || (channel > 13)) { channel = 1; }
-
-#ifdef ARDUINO_ESP8266_RELEASE_2_3_0
-  // bool softAP(const char* ssid, const char* passphrase = NULL, int channel = 1, int ssid_hidden = 0);
-  WiFi.softAP(my_hostname, WIFI_AP_PASSPHRASE, channel, 0);
-#else
-  // bool softAP(const char* ssid, const char* passphrase = NULL, int channel = 1, int ssid_hidden = 0, int max_connection = 4);
-  WiFi.softAP(my_hostname, WIFI_AP_PASSPHRASE, channel, 0, 1);
-#endif
-
-  delay(500); // Without delay I've seen the IP address blank
-  // Setup the DNS server redirecting all the domains to the apIP 
-  DnsServer->setErrorReplyCode(DNSReplyCode::NoError);
-  DnsServer->start(DNS_PORT, "*", WiFi.softAPIP());
-
-  StartWebserver((reset_only ? HTTP_MANAGER_RESET_ONLY : HTTP_MANAGER), WiFi.softAPIP());
-}
-
-void PollDnsWebserver(void)
-{
-  if (DnsServer) { DnsServer->processNextRequest(); }
-  if (WebServer) { WebServer->handleClient(); }
-}
-
-
-//********************************************************************************************
-
-void HandleRoot(void)
-{
-  if (WebServer->hasArg("rst")) {
-    WebRestart(0);
-    return;
-  }
-}*/

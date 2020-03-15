@@ -28,7 +28,8 @@ void onDmxFrame(uint16_t universe, uint16_t length, uint8_t sequence, uint8_t* d
 {
   if (universe == Settings.DMXUniverse)
   {
-    uint16_t address = Settings.DMXAddress;
+    uint16_t address = Settings.DMXAddress - 1; // data is indexed from 0, address starts at 1
+    if (address < )
     setLEDColor(data[address], 
                 data[address + 1], 
                 data[address + 2], 

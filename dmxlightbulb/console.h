@@ -9,8 +9,6 @@
 
 #include <Arduino.h>
 
-
-
 class ConsoleClass : public Print {
 public:
     inline ConsoleClass() {

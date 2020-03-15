@@ -10,9 +10,13 @@
 #ifndef SETTINGS_H
 #define SETTINGS_H
 
+// TODO: move these to a constants file
+#define DMX_MAX_ADDRESS 512
+#define DMX_MAX_UNIVERSE 128
+
 struct CONFIG {
-    uint16_t DMXUniverse = 1;
-    uint16_t DMXAddress = 1;
+    int DMXUniverse = 1;
+    int DMXAddress = 1;
     bool sACNEnable = false;
     bool artnetEnable = true;
     int sACNPollDelay = 16; // ms (fast enough to keep up with 60Hz)

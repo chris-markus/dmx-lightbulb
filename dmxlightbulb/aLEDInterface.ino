@@ -122,15 +122,19 @@ void LEDSetup(void)
     pinMode(Sm16716.pin_dat, OUTPUT);
     digitalWrite(Sm16716.pin_dat, LOW);
 
-    pinMode(Sm16716.pin_sel, OUTPUT);
-    digitalWrite(Sm16716.pin_sel, HIGH);
-
     pinMode(GPIO_WHITE_PWM, OUTPUT);
     digitalWrite(GPIO_WHITE_PWM, LOW);
 
+    pinMode(Sm16716.pin_sel, OUTPUT);
+    digitalWrite(Sm16716.pin_sel, HIGH);
+
     SM16716_Init();
-    delayMicroseconds(100);
-    SM16716_Update(0,0,0);
+
+    // do our best to prevent the leds from flashing when we enable the chip
+    unsigned long start = millis();
+    while (millis() < start + 2) {
+      SM16716_Update(0,0,0);
+    }
 }
 
 void setLEDColor(uint8_t r, uint8_t g, uint8_t b, uint8_t w) {
