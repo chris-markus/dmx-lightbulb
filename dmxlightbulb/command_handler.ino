@@ -6,7 +6,6 @@
 
 #include "command.h"
 #include "settings.h"
-#include "constants.h"
 #include "driver.h"
 
 bool boolCmdHelper(void* setting, const char* value) {
@@ -66,17 +65,17 @@ bool cmd_colorHandler(void* setting, const char* value) {
 }
 
 bool cmd_networkControlHandler(void* setting, const char* value) {
-  if (strcmp(value, "artnet") == 0) {
+  if (strcmp(value, CMD_NETWORK_VALUE_ARTNET) == 0) {
+    drv_artnet.setupFunc();
     Settings.artnetEnable = true;
     Settings.sACNEnable = false;
-    drv_artnet.setupFunc();
   }
-  else if (strcmp(value, "sacn") == 0) {
+  else if (strcmp(value, CMD_NETWORK_VALUE_SACN) == 0) {
+    drv_sACN.setupFunc();
     Settings.artnetEnable = false;
     Settings.sACNEnable = true;
-    drv_sACN.setupFunc();
   }
-  else if (strcmp(value, "none") == 0) {
+  else if (strcmp(value, CMD_NETWORK_VALUE_NONE) == 0) {
     Settings.artnetEnable = false;
     Settings.sACNEnable = false;
   }
@@ -94,32 +93,53 @@ bool cmd_arduinoOTAHandler(void* setting, const char* value) {
   return retVal;
 }
 
+bool cmd_saveColorHandler(void* setting, const char* value) {
+  return boolCmdHelper(setting, value);
+}
+
+bool cmd_rebootHandler(void* setting, const char* value) {
+  ESP.restart();
+  return true;
+}
+
 Command cmd_networkControl = {
-  "networkControl",
+  CMD_NETWORK_NAME,
   NULL,
   cmd_networkControlHandler,
 };
 
 Command cmd_arduinoOTAEnable = {
-  "arduinoOTAEnable",
+  CMD_ARDUINOOTA_NAME,
   (void*)(&Settings.arduinoOTAEnable),
   cmd_arduinoOTAHandler,
 };
 
 Command cmd_color = {
-  "color",
+  CMD_COLOR_NAME,
   NULL,
   cmd_colorHandler,
 };
 
 Command cmd_dmxAddress = {
-  "dmxAddress",
+  CMD_DMXADDRESS_NAME,
   (void*)(&Settings.DMXAddress),
   cmd_DMXAddressHandler,
 };
 
 Command cmd_dmxUniverse = {
-  "dmxUniverse",
+  CMD_DMXUNIVERSE_NAME,
   (void*)(&Settings.DMXUniverse),
   cmd_DMXUniverseHandler,
+};
+
+Command cmd_saveColor = {
+  CMD_SAVECOLOR_NAME,
+  (void*)(&Settings.saveColor),
+  cmd_saveColorHandler,
+};
+
+Command cmd_reboot = {
+  CMD_REBOOT_NAME,
+  NULL,
+  cmd_rebootHandler,
 };

@@ -81,6 +81,10 @@ void WebserverAddFragment(int bufferSize, const char* format, ...) {
   delete buff;
 }
 
+void WebserverAddFragment(const char* format) {
+  server.sendContent(format);
+}
+
 // ---------------------------- Components -------------------------------
 
 void WebserverStatusReadout() {
@@ -102,6 +106,7 @@ void handleRoot() {
   WebserverButton(F("Settings"), F("/settings"));
   WebserverButton(F("Console"), F("/console"));
   WebserverButton(F("Firmware Update"), F("/update"));
+  WebserverAddFragment(WEBPAGE_REBOOT_BUTTON);
   WebserverEndPage();
 }
 
@@ -159,7 +164,7 @@ void handleCmd() {
       }
     }
 
-    if (server.argName(i) == F("redirect")) {
+    if (server.argName(i) == REDIRECT) {
       redirectURI = server.arg(i);
     }
   }
@@ -175,25 +180,6 @@ void handleCmd() {
 }
 
 // --------------------------- Utilities ----------------------------
-
-bool setColor(const String colorString) {
-  Settings.artnetEnable = false;
-  Settings.sACNEnable = false;
-  if (colorString.length() >= 8) {
-    int start = 0;
-    if(colorString.substring(0,1) == "#") {
-      start = 1;
-    }
-    unsigned long colorVal = strtoll(colorString.substring(start).c_str(), NULL, 16);
-    Serial.println(colorString.substring(start));
-    Serial.println(colorVal);
-    setLEDColor((uint8_t)((colorVal>>((unsigned long)(24)))), (uint8_t)((colorVal&0xFF0000)>>16), (uint8_t)((colorVal&0xFF00)>>8), (uint8_t)(colorVal&0xFF));
-    Serial.print("Setting Color: ");
-    Serial.println((uint8_t)((colorVal>>24)));
-    return true;
-  }
-  return false;
-}
 
 String _updaterError = "";
 bool _serial_output = true;

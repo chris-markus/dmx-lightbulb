@@ -1,4 +1,13 @@
-//static const char * HEADER_KEYS[] = { "User-Agent", };
+// =====================================================
+// Copyright (C) 2020 Christopher Markus 
+// www.chrismarkus.me
+// This software is licensed under the GNU GPLv3 License
+// =====================================================
+
+#ifndef WEB_CONTENT_H
+#define WEB_CONTENT_H
+
+#include "command.h"
 
 #define COLOR_BACKGROUND "#FFFFFF"
 #define COLOR_FOREGROUND "#212121"
@@ -58,17 +67,20 @@ const char WEBPAGE_STATUS_READOUT[] PROGMEM =
 const char WEBPAGE_BUTTON[] PROGMEM = 
   "<a class='button' href='%s'>%s</a>";
 
+const char WEBPAGE_REBOOT_BUTTON[] PROGMEM = 
+  "<script> function r() {var x = new XMLHttpRequest(); x.open('GET', '/cmd?" CMD_REBOOT_NAME "=1', true);x.send();document.body.innerHTML='<h2>Rebooting...</h2>'; window.location.href='/';}</script>"
+  "<a class='button' href='#' onclick='r()' id='rebootBtn'>Reboot</a>";
 
 // ------------------------------ Update Page --------------------------------
 static const char WEBPAGE_UPDATE[] PROGMEM =
   "<h2>Arduino OTA</h2>"
   "<form method='POST' action='/cmd'>"
     "<label for='OTA'>Arduino OTA: </label>"
-    "<select name='arduinoOTAEnable' id='OTA'>"
-      "<option value='1' %s >Enable</option>"
-      "<option value='0' %s >Disable</option>"
+    "<select name='" CMD_ARDUINOOTA_NAME "' id='OTA'>"
+      "<option value='" CMD_ARDUINOOTA_VALUE_TRUE "' %s >Enable</option>"
+      "<option value='" CMD_ARDUINOOTA_VALUE_FALSE "' %s >Disable</option>"
     "</select>"
-    "<input hidden name='redirect' value='/update'>"
+    "<input hidden name='" REDIRECT "' value='/update'>"
     "<input class='button' type='submit' value='Save'>"
   "</form>"
   "<h2>Firmware Upload</h2>"
@@ -101,19 +113,21 @@ static const char WEBPAGE_SETTINGS[] PROGMEM =
     "<table>"
     "<tr>"
     "<td><label for='networkControl'>Control Protocol: </label></td>"
-    "<td><select name='networkControl' id='networkControl'>"
-      "<option value='artnet' %s >ArtNet</option>"
-      "<option value='sacn' %s >sACN</option>"
-      "<option value='none' %s >Disabled</option>"
+    "<td><select name='" CMD_NETWORK_NAME "' id='networkControl'>"
+      "<option value='" CMD_NETWORK_VALUE_ARTNET "' %s >ArtNet</option>"
+      "<option value='" CMD_NETWORK_VALUE_SACN "' %s >sACN</option>"
+      "<option value='" CMD_NETWORK_VALUE_NONE "' %s >Disabled</option>"
     "</select></td>"
     "</tr><tr>"
     "<td><label for='address'>Address: </label></td>"
-    "<td><input type='text' name='dmxAddress' placeholder='%d' id='address'></td>"
+    "<td><input type='text' name='" CMD_DMXADDRESS_NAME "' placeholder='%d' id='address'></td>"
     "</tr><tr>"
     "<td><label for='universe'>Universe: </label></td>"
-    "<td><input type='text' name='dmxUniverse' placeholder='%d' id='universe'></td>"
+    "<td><input type='text' name='" CMD_DMXUNIVERSE_NAME "' placeholder='%d' id='universe'></td>"
     "</tr></table>"
-    "<input hidden name='redirect' value='/settings'>"
+    "<input hidden name='" REDIRECT "' value='/settings'>"
     "<input class='button' type='submit' value='Save'>"
   "</form>"
   ;
+
+#endif
