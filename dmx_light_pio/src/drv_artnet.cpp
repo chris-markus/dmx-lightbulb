@@ -58,7 +58,8 @@ void onDmxFrame(uint16_t universe, uint16_t length, uint8_t sequence, uint8_t* d
 }
 
 static inline bool get_enabled() {
-  return Settings::artnetEnable.get();
+  // Settings interface already makes these exclusive, but just in case add it here to protect cycle time.
+  return Settings::artnetEnable.get() && !Settings::sACNEnable.get();
 }
 
 static inline int get_poll_delay() {

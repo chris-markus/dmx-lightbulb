@@ -23,8 +23,8 @@ public:
         , cb_connect_primary(on_connect_primary)
         , cb_disconnect(on_disconnect)
         , is_connected(false)
-        , state(WifiState::ScanningBootstrap)
-        , last_state(WifiState::ScanningPrimary)
+        , state(WifiState::ScanningPrimary)
+        , last_state(WifiState::COUNT)
         , last_state_change(0UL)
     {}
 

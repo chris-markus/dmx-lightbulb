@@ -50,7 +50,7 @@ static inline bool get_enabled() {
 }
 
 static inline int get_poll_delay() {
-  return 16; // ms (fast enough to keep up with 60Hz)
+  return 25; // ms
 }
 
 struct Driver drv_sACN = {

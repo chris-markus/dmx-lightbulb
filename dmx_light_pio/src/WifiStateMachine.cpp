@@ -12,7 +12,7 @@ static const char *bootstrap_ssid = "Bulbs";
 static const char *bootstrap_password = "l!ghtbu1b";
 
 static constexpr unsigned long scan_timeout = 10 * 1000;
-static constexpr unsigned long bootstrap_timeout = 15 * 1000;
+static constexpr unsigned long bootstrap_timeout = 30 * 1000;
 
 #define PrintIfNot(condition) \
     if (!(condition)) { \
@@ -22,6 +22,8 @@ static constexpr unsigned long bootstrap_timeout = 15 * 1000;
 void WifiStateMachine::initialize()
 {
     last_state_change = millis();
+    state = WifiState::ScanningPrimary;
+    last_state = WifiState::COUNT;
 }
 
 const String WifiStateMachine::ip_address()
@@ -38,6 +40,7 @@ void WifiStateMachine::tick()
                 WiFi.mode(WIFI_STA);
                 WiFi.begin(Settings::ssid.get().data(), Settings::password.get().data());
                 last_state = WifiState::ScanningPrimary;
+                last_state_change = millis();
             }
 
             if (WiFi.status() == WL_CONNECTED) {

@@ -144,18 +144,22 @@ void handleSettings() {
   WebserverStatusReadout();
   const int len = sizeof(WEBPAGE_SETTINGS)
     + sizeof(selected) * 3
+    + Settings::alias.size()
     + Settings::ssid.size()
-    + Settings::password.size()
+    + Settings::mqtt_broker.size()
+    + Settings::mqtt_username.size()
     + Settings::DMXAddress.size()
     + Settings::DMXUniverse.size();
   WebserverAddFragment(
     len,
     WEBPAGE_SETTINGS,
+    Settings::alias.get().data(),
     Settings::artnetEnable.get()?selected:empty,
     Settings::sACNEnable.get()?selected:empty,
     (!Settings::artnetEnable.get() && !Settings::sACNEnable.get())?selected:empty,
     Settings::ssid.get().data(),
-    Settings::password.get().data(),
+    Settings::mqtt_broker.get().data(),
+    Settings::mqtt_username.get().data(),
     Settings::DMXAddress.get(),
     Settings::DMXUniverse.get());
   WebserverEndPage();

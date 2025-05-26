@@ -13,12 +13,14 @@
 
 const int mqtt_port = 1883;
 const unsigned long STATUS_INTERVAL = 1000; // 1 second
+const unsigned long SETUP_INTERVAL = 1000; // 1 second
 
 WiFiClient wifi_client{};
 PubSubClient client(wifi_client);
 
 bool mqtt_initialized = false;
 unsigned long last_status_publish = 0;
+unsigned long last_setup_attempt = 0;  // Add timestamp for setup attempts
 uint8_t cached_color[4] = {0, 0, 0, 0}; // Store last color when power is turned off
 
 void publish_status() {
@@ -126,6 +128,7 @@ void mqttSetup() {
         mqtt_initialized = true;
     } else {
         Serial.println("MQTT Connection failed!");
+        mqtt_initialized = false;
     }
 }
 
@@ -138,6 +141,14 @@ void mqttLoop() {
         if (now - last_status_publish >= STATUS_INTERVAL) {
             publish_status();
             last_status_publish = now;
+        }
+    }
+    else {
+        // Only attempt setup every second
+        const unsigned long now = millis();
+        if (now - last_setup_attempt >= SETUP_INTERVAL) {
+            mqttSetup();
+            last_setup_attempt = now;
         }
     }
 }

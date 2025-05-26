@@ -48,6 +48,15 @@
 // alias command
 #define CMD_ALIAS_SET_NAME          "alias"
 
+// mqtt username command
+#define CMD_MQTT_USERNAME_NAME      "mqttUsername"
+
+// mqtt password command
+#define CMD_MQTT_PASSWORD_NAME      "mqttPassword"
+
+// mqtt broker command
+#define CMD_MQTT_BROKER_NAME        "mqttBroker"
+
 // ---------------------------------------------------------------------------
 
 typedef bool (*CommandFunc)(void*, const char*);
@@ -69,7 +78,10 @@ extern Command cmd_reboot;
 extern Command cmd_ssid;
 extern Command cmd_pasphrase;
 extern Command cmd_alias;
+extern Command cmd_mqttUsername;
+extern Command cmd_mqttPassword;
+extern Command cmd_mqttBroker;
 
-constexpr size_t num_commands = 10;
+constexpr size_t num_commands = 12;
 
 extern Command commands[num_commands];

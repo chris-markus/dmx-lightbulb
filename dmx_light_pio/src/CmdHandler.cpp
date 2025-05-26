@@ -10,6 +10,8 @@
 #include "InstanceManager.h"
 #include "SettingsManager.h"
 #include "driver.h"
+#include "WebServer.h"
+#include "ESP8266WiFi.h"
 
 Command commands[num_commands] = {
   cmd_networkControl,
@@ -20,7 +22,10 @@ Command commands[num_commands] = {
   cmd_reboot,
   cmd_ssid,
   cmd_pasphrase,
-  cmd_alias
+  cmd_alias,
+  cmd_mqttUsername,
+  cmd_mqttPassword,
+  cmd_mqttBroker
 };
 
 bool boolCmdHelper(void* setting, const char* value) {
@@ -122,6 +127,9 @@ bool cmd_arduinoOTAHandler(void* setting, const char* value) {
 }
 
 bool cmd_rebootHandler(void* setting, const char* value) {
+  StopWebserver();
+  WiFi.softAPdisconnect();
+  delay(500);
   ESP.restart();
   return true;
 }
@@ -169,7 +177,7 @@ Command cmd_ssid = {
 };
 
 Command cmd_pasphrase = {
-  CMD_SSID_SET_NAME,
+  CMD_PASSWORD_SET_NAME,
   (void*)(&Settings::password),
   stringCmdHelper<char_array_32>,
 };
@@ -178,4 +186,22 @@ Command cmd_alias = {
   CMD_ALIAS_SET_NAME,
   (void*)(&Settings::alias),
   stringCmdHelper<char_array_16>,
+};
+
+Command cmd_mqttUsername = {
+  CMD_MQTT_USERNAME_NAME,
+  (void*)(&Settings::mqtt_username),
+  stringCmdHelper<char_array_32>,
+};
+
+Command cmd_mqttPassword = {
+  CMD_MQTT_PASSWORD_NAME,
+  (void*)(&Settings::mqtt_password),
+  stringCmdHelper<char_array_32>,
+};
+
+Command cmd_mqttBroker = {
+  CMD_MQTT_BROKER_NAME,
+  (void*)(&Settings::mqtt_broker),
+  stringCmdHelper<char_array_32>,
 };

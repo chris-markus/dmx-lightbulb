@@ -12,7 +12,6 @@ Required Libraries:
 */
 
 #include <Arduino.h>
-
 #include <ESP8266mDNS.h>
 #include <WiFiUdp.h>
 
@@ -22,24 +21,10 @@ Required Libraries:
 #include "LedInterface.h"
 #include "InstanceManager.h"
 
-#ifndef STASSID
-#define STASSID "Bulbs"
-#define STAPSK  "lightbulb"
-#endif
-
-void LEDSetup(void);
-
-const char* ssid = STASSID;
-const char* password = STAPSK;
-
-const char* mesh_ssid = "Bulbs";
-const char* mesh_password = "lightbulb";
-
 const uint8_t GPIO_SM16716_CLK = 5;
 const uint8_t GPIO_SM16716_DAT = 4;
 const uint8_t GPIO_SM16716_SEL = 13;
 const uint8_t GPIO_WHITE_PWM   = 12;
-const unsigned long WIFI_TIMEOUT = 10 * 1000;
 
 void onWifiConnectPrimary();
 void onWifiConnectBootstrap();
@@ -48,9 +33,7 @@ void onWifiDisconnect();
 LedInterface led_interface {GPIO_SM16716_CLK, GPIO_SM16716_DAT, GPIO_SM16716_SEL, GPIO_WHITE_PWM};
 WifiStateMachine wifi_mgr {onWifiConnectBootstrap, onWifiConnectPrimary, onWifiDisconnect};
 
-/*
- * Some Globals... TODO: make these not globals
- */
+// Some Globals... TODO: make these not globals
 InstanceManager globals(led_interface, wifi_mgr);
 
 void setup() {
@@ -58,26 +41,10 @@ void setup() {
   Serial.println("Booting...");
   
   led_interface.init();
-
   SettingsManager::initialize();
-
   wifi_mgr.initialize();
 
-  // Port defaults to 8266
-  // ArduinoOTA.setPort(8266);
-
-  // Hostname defaults to esp8266-[ChipID]
-  // ArduinoOTA.setHostname("myesp8266");
-
-  // No authentication by default
-  // ArduinoOTA.setPassword("admin");
-
-  // Password can be set with it's md5 value as well
-  // MD5(admin) = 21232f297a57a5a743894a0e4a801fc3
-  // ArduinoOTA.setPasswordHash("21232f297a57a5a743894a0e4a801fc3");
-
   Serial.println("Ready");
-  //strcpy(Settings::ipAddress, WiFi.localIP().toString().c_str());
 }
 
 void loop() {
@@ -85,7 +52,6 @@ void loop() {
   if (wifi_mgr.connected()) {
     driverLoop();
   }
-  // for background tasks like wifi
   delay(1);
 }
 
@@ -101,5 +67,4 @@ void onWifiConnectBootstrap() {
 }
 
 void onWifiDisconnect() {
-  
 }
