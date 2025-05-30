@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Lightbulb Management</title>
+        <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+        <script src="https://cdn.tailwindcss.com"></script>
+        <style>
+            body {
+                background-color: #111111;
+            }
+            .light-row:hover {
+                background-color: #1c1c1c;
+            }
+            .light-row td {
+                padding: 0.75rem;
+                border-bottom: 1px solid #2c2c2c;
+            }
+        </style>
+    </head>
+    <body class="text-gray-100">
+        <!-- Login Form -->
+        <div id="login-form" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+            <div class="bg-[#1c1c1c] p-8 rounded-lg shadow-lg w-96 border border-[#2c2c2c]">
+                <h2 class="text-2xl font-bold mb-6 text-center text-gray-100">MQTT Login</h2>
+                <form id="mqtt-login" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-300">Username</label>
+                        <input type="text" id="mqtt-username" class="mt-1 block w-full rounded-md bg-[#2c2c2c] border-[#3c3c3c] text-gray-100 shadow-sm focus:border-blue-500 focus:ring-blue-500" required>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-300">Password</label>
+                        <input type="password" id="mqtt-password" class="mt-1 block w-full rounded-md bg-[#2c2c2c] border-[#3c3c3c] text-gray-100 shadow-sm focus:border-blue-500 focus:ring-blue-500" required>
+                    </div>
+                    <button type="submit" class="w-full bg-[#03a9f4] text-white py-2 px-4 rounded-md hover:bg-[#0288d1] focus:outline-none focus:ring-2 focus:ring-[#03a9f4] focus:ring-offset-2 focus:ring-offset-[#1c1c1c]">
+                        Connect
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Main Dashboard (initially hidden) -->
+        <div id="dashboard" class="hidden">
+            <div class="container mx-auto px-4 py-8">
+                <div class="flex justify-between items-center mb-8">
+                    <h1 class="text-3xl font-bold text-gray-100">Lightbulb Management</h1>
+                    <div class="flex items-center space-x-4">
+                        <div id="connection-status" class="px-3 py-1 rounded-full text-sm font-medium bg-red-900 text-red-200">
+                            Disconnected
+                        </div>
+                        <button id="connect-btn" class="px-4 py-2 bg-[#03a9f4] text-white rounded-md hover:bg-[#0288d1] focus:outline-none focus:ring-2 focus:ring-[#03a9f4] focus:ring-offset-2 focus:ring-offset-[#111111]">
+                            Connect
+                        </button>
+                    </div>
+                </div>
+
+                <div class="bg-[#1c1c1c] rounded-lg shadow overflow-hidden border border-[#2c2c2c]">
+                    <table class="min-w-full divide-y divide-[#2c2c2c]">
+                        <thead class="bg-[#2c2c2c]">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Name</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Status</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Color</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Brightness</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Dashboard</th>
+                            </tr>
+                        </thead>
+                        <tbody id="lights-table" class="bg-[#1c1c1c] divide-y divide-[#2c2c2c]">
+                            <!-- Lights will be added here dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <script>
+            let client = null;
+            const lights = new Map(); // Map of light alias to light data
+            const mqttConfig = {
+                host: window.location.hostname,
+                port: 1884, // WebSocket port
+                path: '/mqtt'
+            };
+
+            // Add last update tracking
+            const lastUpdateTimes = new Map(); // Map of light alias to last update timestamp
+            const UPDATE_INTERVAL = 500; // 500ms
+            const DISCONNECT_TIMEOUT = 10000; // 10 seconds
+            let updateTimer = null;
+
+            function scheduleUpdate() {
+                if (!updateTimer) {
+                    updateTimer = setTimeout(() => {
+                        updateLightsTable();
+                        updateTimer = null;
+                    }, UPDATE_INTERVAL);
+                }
+            }
+
+            // Check for stored credentials
+            const storedUsername = sessionStorage.getItem('mqtt_username');
+            const storedPassword = sessionStorage.getItem('mqtt_password');
+
+            if (storedUsername && storedPassword) {
+                document.getElementById('mqtt-username').value = storedUsername;
+                document.getElementById('mqtt-password').value = storedPassword;
+                connectMQTT(storedUsername, storedPassword);
+            }
+
+            function connectMQTT(username, password) {
+                if (client) {
+                    client.end();
+                }
+
+                const options = {
+                    username: username,
+                    password: password
+                };
+
+                client = mqtt.connect(`ws://${mqttConfig.host}:${mqttConfig.port}${mqttConfig.path}`, options);
+
+                client.on('connect', () => {
+                    console.log('Connected to MQTT broker');
+                    document.getElementById('connection-status').className = 'px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800';
+                    document.getElementById('connection-status').textContent = 'Connected';
+                    document.getElementById('connect-btn').textContent = 'Disconnect';
+                    
+                    // Show dashboard, hide login
+                    document.getElementById('login-form').classList.add('hidden');
+                    document.getElementById('dashboard').classList.remove('hidden');
+                    
+                    // Subscribe to all light configs
+                    client.subscribe('homeassistant/light/+/config');
+                    // Subscribe to all light states
+                    client.subscribe('light/+/status');
+
+                    // Start the update cycle
+                    scheduleUpdate();
+                });
+
+                client.on('message', (topic, message) => {
+                    try {
+                        const data = JSON.parse(message.toString());
+                        
+                        if (topic.startsWith('homeassistant/light/') && topic.endsWith('/config')) {
+                            // Handle light discovery
+                            const alias = topic.split('/')[2];
+                            lights.set(alias, {
+                                name: data.name,
+                                dashboardUrl: data.device?.cu || '#',
+                                statusTopic: data.stat_t,
+                                status: 'Disconnected',
+                                color: { r: 0, g: 0, b: 0 },
+                                brightness: 0
+                            });
+                            // Subscribe to this light's status topic
+                            client.subscribe(data.stat_t);
+                            // Always update the table immediately when a new light is discovered.
+                            updateLightsTable();
+                            scheduleUpdate(); 
+                        } else if (topic.startsWith('light/')) {
+                            // Handle light state update - check if this is a status topic
+                            const light = Array.from(lights.values()).find(l => l.statusTopic === topic);
+                            if (light) {
+                                light.status = data.state;
+                                if (data.color) {
+                                    light.color = data.color;
+                                    light.mode = 'rgb';
+                                } else if (data.color_temp !== undefined) {
+                                    light.color_temp = data.color_temp;
+                                    light.mode = 'color_temp';
+                                }
+                                if (data.brightness !== undefined) {
+                                    light.brightness = Math.round((data.brightness / 255) * 100);
+                                }
+                                lastUpdateTimes.set(light.name, Date.now());
+                                scheduleUpdate();
+                            }
+                        }
+                    } catch (e) {
+                        console.error('Error processing message:', e);
+                    }
+                });
+
+                client.on('error', (err) => {
+                    console.error('MQTT Error:', err);
+                    document.getElementById('connection-status').className = 'px-3 py-1 rounded-full text-sm font-medium bg-red-100 text-red-800';
+                    document.getElementById('connection-status').textContent = 'Error';
+                    
+                    // If authentication error, show login form
+                    if (err.message.includes('auth')) {
+                        document.getElementById('login-form').classList.remove('hidden');
+                        document.getElementById('dashboard').classList.add('hidden');
+                        sessionStorage.removeItem('mqtt_username');
+                        sessionStorage.removeItem('mqtt_password');
+                    }
+                });
+
+                client.on('close', () => {
+                    console.log('Disconnected from MQTT broker');
+                    document.getElementById('connection-status').className = 'px-3 py-1 rounded-full text-sm font-medium bg-red-100 text-red-800';
+                    document.getElementById('connection-status').textContent = 'Disconnected';
+                    document.getElementById('connect-btn').textContent = 'Connect';
+                });
+            }
+
+            function updateLightsTable() {
+                const table = document.getElementById('lights-table');
+                table.innerHTML = '';
+                const now = Date.now();
+
+                if (lights.size === 0) {
+                    const loadingRow = document.createElement('tr');
+                    loadingRow.innerHTML = `
+                        <td colspan="5" class="px-6 py-8 text-center text-gray-400">
+                            <div class="flex flex-col items-center space-y-2">
+                                <svg class="animate-spin h-8 w-8 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                                <span>Waiting for lights to be discovered...</span>
+                            </div>
+                        </td>
+                    `;
+                    table.appendChild(loadingRow);
+                    return;
+                }
+
+                lights.forEach((light, alias) => {
+                    // Check if light is disconnected (no updates in last 10 seconds)
+                    const lastUpdate = lastUpdateTimes.get(alias);
+                    if (lastUpdate && (now - lastUpdate > DISCONNECT_TIMEOUT)) {
+                        light.status = 'Disconnected';
+                    }
+
+                    const row = document.createElement('tr');
+                    row.className = 'light-row';
+                    
+                    // Color preview
+                    const colorPreview = document.createElement('div');
+                    colorPreview.className = 'w-6 h-6 rounded-full border border-[#3c3c3c]';
+                    
+                    if (light.mode === 'rgb') {
+                        colorPreview.style.backgroundColor = `rgb(${light.color.r}, ${light.color.g}, ${light.color.b})`;
+                    } else {
+                        // Color temp mode - calculate RGB values similar to firmware
+                        const brightness = light.brightness * 2.55; // Convert percentage to 0-255
+                        if (light.color_temp > 326) {  // Warmer than neutral
+                            // Add red for warmth
+                            const r = Math.round(((light.color_temp - 326) * brightness) / 174);
+                            colorPreview.style.backgroundColor = `rgb(${r}, 0, 0)`;
+                        } else {  // Cooler than neutral
+                            // Add blue for coolness
+                            const b = Math.round(((326 - light.color_temp) * brightness) / 173);
+                            colorPreview.style.backgroundColor = `rgb(0, 0, ${b})`;
+                        }
+                    }
+                    
+                    // Status badge color based on state
+                    let statusClass = 'bg-gray-700 text-gray-300';
+                    if (light.status === 'ON') {
+                        statusClass = 'bg-green-900 text-green-200';
+                    } else if (light.status === 'OFF') {
+                        statusClass = 'bg-yellow-900 text-yellow-200';
+                    } else if (light.status === 'Disconnected') {
+                        statusClass = 'bg-red-900 text-red-200';
+                    }
+                    
+                    row.innerHTML = `
+                        <td class="font-medium text-gray-100">${light.name}</td>
+                        <td>
+                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${statusClass}">
+                                ${light.status}
+                            </span>
+                        </td>
+                        <td>${colorPreview.outerHTML}</td>
+                        <td class="text-gray-300">${light.brightness}%</td>
+                        <td>
+                            <a href="${light.dashboardUrl}" target="_blank" class="text-[#03a9f4] hover:text-[#0288d1]">
+                                ${light.dashboardUrl}
+                            </a>
+                        </td>
+                    `;
+                    
+                    table.appendChild(row);
+                });
+            }
+
+            // Login form handler
+            document.getElementById('mqtt-login').addEventListener('submit', (e) => {
+                e.preventDefault();
+                const username = document.getElementById('mqtt-username').value;
+                const password = document.getElementById('mqtt-password').value;
+                
+                // Store credentials in session storage
+                sessionStorage.setItem('mqtt_username', username);
+                sessionStorage.setItem('mqtt_password', password);
+                
+                connectMQTT(username, password);
+            });
+
+            // Connect button handler
+            document.getElementById('connect-btn').addEventListener('click', () => {
+                if (client && client.connected) {
+                    client.end();
+                    sessionStorage.removeItem('mqtt_username');
+                    sessionStorage.removeItem('mqtt_password');
+                    document.getElementById('login-form').classList.remove('hidden');
+                    document.getElementById('dashboard').classList.add('hidden');
+                } else {
+                    const username = sessionStorage.getItem('mqtt_username');
+                    const password = sessionStorage.getItem('mqtt_password');
+                    if (username && password) {
+                        connectMQTT(username, password);
+                    } else {
+                        document.getElementById('login-form').classList.remove('hidden');
+                        document.getElementById('dashboard').classList.add('hidden');
+                    }
+                }
+            });
+        </script>
+    </body>
+</html>
